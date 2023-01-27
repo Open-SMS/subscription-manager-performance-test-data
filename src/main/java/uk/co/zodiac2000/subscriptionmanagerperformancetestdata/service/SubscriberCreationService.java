@@ -34,10 +34,11 @@ public class SubscriberCreationService {
     /**
      * Creates subscribers.
      * @param numberOfSubscribers the number of subscribers to create
+     * @param numberOfThreads the number of threads to use
      * @throws InterruptedException 
      */
-    public void createSubscribers(int numberOfSubscribers) throws InterruptedException {
-        ExecutorService executorService = Executors.newFixedThreadPool(4);
+    public void createSubscribers(int numberOfSubscribers, int numberOfThreads) throws InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
         try {
             for (int index = 0; index < numberOfSubscribers; index = index + 1) {
                 final int functionIndex = index;
