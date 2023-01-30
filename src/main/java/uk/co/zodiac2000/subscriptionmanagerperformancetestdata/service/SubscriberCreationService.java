@@ -2,6 +2,8 @@ package uk.co.zodiac2000.subscriptionmanagerperformancetestdata.service;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -35,22 +37,34 @@ public class SubscriberCreationService {
      * Creates subscribers.
      * @param numberOfSubscribers the number of subscribers to create
      * @param numberOfThreads the number of threads to use
-     * @throws InterruptedException 
+     * @throws InterruptedException
      */
     public void createSubscribers(int numberOfSubscribers, int numberOfThreads) throws InterruptedException {
         ExecutorService executorService = Executors.newFixedThreadPool(numberOfThreads);
+        CompletionService completionService = new ExecutorCompletionService(executorService);
         try {
             for (int index = 0; index < numberOfSubscribers; index = index + 1) {
-                final int functionIndex = index;
-                executorService.submit(() -> {
-                    String subscriberName = this.subscriberNameService.getSubscriberName(functionIndex);
+                final int subscriberIndex = index;
+                completionService.submit(() -> {
+                    String subscriberName = this.subscriberNameService.getSubscriberName(subscriberIndex);
                     Set<OidcIdentifierCommandDto> oidcIdentifierCommandDtos
-                            = this.subscriberOidcIdentifierCommandDtoService.getOidcIdentifierCommandDto(functionIndex);
+                            = this.subscriberOidcIdentifierCommandDtoService
+                                    .getOidcIdentifierCommandDto(subscriberIndex);
                     Optional<SubscriberResponseDto> subscriber
                             = this.subscriberService.createSubscriber(new NewSubscriberCommandDto(subscriberName));
                     this.subscriberService.setOidcIdentifiers(subscriber.get().getId(), oidcIdentifierCommandDtos);
-                    LOG.debug("Created subscriber {}", functionIndex);
+                    LOG.debug("Created subscriber {}", subscriberIndex);
+                    return true;
                 });
+            }
+            // Wait for tasks to complete and output progress of completed tasks at 10% intervals.
+            final int progressMessageIndex = numberOfSubscribers / 10;
+            for (int completedTasks = 0; completedTasks < numberOfSubscribers; completedTasks++) {
+                completionService.take();
+                if (completedTasks % progressMessageIndex == 0) {
+                    Float percentComplete = (((float) completedTasks / (float) numberOfSubscribers) * 100);
+                    System.out.println("Progress: " + percentComplete.intValue() + "%");
+                }
             }
         } finally {
             executorService.shutdown();
